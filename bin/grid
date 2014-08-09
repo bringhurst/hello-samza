@@ -16,8 +16,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This script will download, setup, start, and stop servers for Kafka, YARN, and ZooKeeper,
-# as well as downloading, building and locally publishing Samza
+# This script will download, setup, start, and stop servers for Kafka, YARN,
+# Mesos, and ZooKeeper, as well as download, build, and locally publish Samza.
 
 if [ -z "$JAVA_HOME" ]; then
   if [ -x /usr/libexec/java_home ]; then
@@ -35,23 +35,40 @@ DOWNLOAD_CACHE_DIR=$HOME/.samza/download
 COMMAND=$1
 SYSTEM=$2
 
-DOWNLOAD_KAFKA=http://www.us.apache.org/dist/kafka/0.8.1.1/kafka_2.9.2-0.8.1.1.tgz
+DOWNLOAD_KAFKA=https://www.us.apache.org/dist/kafka/0.8.1.1/kafka_2.9.2-0.8.1.1.tgz
 DOWNLOAD_YARN=https://archive.apache.org/dist/hadoop/common/hadoop-2.2.0/hadoop-2.2.0.tar.gz
-DOWNLOAD_ZOOKEEPER=http://archive.apache.org/dist/zookeeper/zookeeper-3.4.3/zookeeper-3.4.3.tar.gz
+DOWNLOAD_ZOOKEEPER=https://archive.apache.org/dist/zookeeper/zookeeper-3.4.3/zookeeper-3.4.3.tar.gz
+DOWNLOAD_MESOS=https://archive.apache.org/dist/mesos/0.19.1/mesos-0.19.1.tar.gz
 
-bootstrap() {
-  echo "Bootstrapping the system..."
-  stop_all
+bootstrap_yarn() {
+  echo "Bootstrapping the system (Yarn)..."
+  stop_all_yarn
   rm -rf "$DEPLOY_ROOT_DIR"
   mkdir "$DEPLOY_ROOT_DIR"
-  install_all
-  start_all
+  install_all_yarn
+  start_all_yarn
   exit 0
 }
 
-install_all() {
+bootstrap_mesos() {
+  echo "Bootstrapping the system (Mesos)..."
+  stop_all_mesos
+  rm -rf "$DEPLOY_ROOT_DIR"
+  mkdir "$DEPLOY_ROOT_DIR"
+  install_all_mesos
+  start_all_mesos
+  exit 0
+}
+
+install_all_yarn() {
   $DIR/grid install zookeeper
   $DIR/grid install yarn
+  $DIR/grid install kafka
+}
+
+install_all_mesos() {
+  $DIR/grid install zookeeper
+  $DIR/grid install mesos
   $DIR/grid install kafka
 }
 
@@ -81,6 +98,15 @@ install_kafka() {
   sed -i.bak 's/^num\.partitions *=.*/num.partitions=1/' $DEPLOY_ROOT_DIR/kafka/config/server.properties
 }
 
+install_mesos() {
+  mkdir -p "$DEPLOY_ROOT_DIR"
+  install mesos $DOWNLOAD_MESOS mesos-0.19.1
+  pushd $DEPLOY_ROOT_DIR/mesos
+  $DEPLOY_ROOT_DIR/mesos/configure --prefix=$DEPLOY_ROOT_DIR/mesos/build
+  make all install
+  popd
+}
+
 install() {
   DESTINATION_DIR="$DEPLOY_ROOT_DIR/$1"
   DOWNLOAD_URL=$2
@@ -99,9 +125,15 @@ install() {
   mv "$PACKAGE_DIR" "$DESTINATION_DIR"
 }
 
-start_all() {
+start_all_yarn() {
   $DIR/grid start zookeeper
   $DIR/grid start yarn
+  $DIR/grid start kafka
+}
+
+start_all_mesos() {
+  $DIR/grid start zookeeper
+  $DIR/grid start mesos
   $DIR/grid start kafka
 }
 
@@ -135,9 +167,29 @@ start_kafka() {
   fi
 }
 
-stop_all() {
+start_mesos() {
+  if [ -f $DEPLOY_ROOT_DIR/$SYSTEM/build/sbin/mesos-master ]; then
+    local mesos_work_dir=$DEPLOY_ROOT_DIR/$SYSTEM/build/var/lib/mesos-work-dir
+    mkdir -p $mesos_work_dir
+    mkdir -p $DEPLOY_ROOT_DIR/$SYSTEM/build/logs
+    cd $DEPLOY_ROOT_DIR/$SYSTEM/build
+    nohup sbin/mesos-master --ip=127.0.0.1 --work_dir=$mesos_work_dir > logs/mesos-master.log 2>&1 &
+    nohup sbin/mesos-slave --master=127.0.0.1:5050 --ip=127.0.0.1 > logs/mesos-slave.log 2>&1 &
+    cd - > /dev/null
+  else
+    echo 'Mesos is not installed. Run: bin/grid install mesos'
+  fi
+}
+
+stop_all_yarn() {
   $DIR/grid stop kafka
   $DIR/grid stop yarn
+  $DIR/grid stop zookeeper
+}
+
+stop_all_mesos() {
+  $DIR/grid stop kafka
+  $DIR/grid stop mesos
   $DIR/grid stop zookeeper
 }
 
@@ -170,9 +222,17 @@ stop_kafka() {
   fi
 }
 
+stop_mesos() {
+  echo "Stopping mesos has not been implemented."
+  # TODO: figure out how to cleanly stop mesos.
+}
+
 # Check arguments
 if [ "$COMMAND" == "bootstrap" ] && test -z "$SYSTEM"; then
-  bootstrap
+  bootstrap_yarn
+  exit 0
+elif [ "$COMMAND" == "bootstrap-mesos" ] && test -z "$SYSTEM"; then
+  bootstrap_mesos
   exit 0
 elif (test -z "$COMMAND" && test -z "$SYSTEM") \
   || ( [ "$COMMAND" == "help" ] || test -z "$COMMAND" || test -z "$SYSTEM"); then
@@ -181,9 +241,9 @@ elif (test -z "$COMMAND" && test -z "$SYSTEM") \
   echo
   echo "  $ grid"
   echo "  $ grid bootstrap"
-  echo "  $ grid install [yarn|kafka|zookeeper|all]"
-  echo "  $ grid start [yarn|kafka|zookeeper|all]"
-  echo "  $ grid stop [yarn|kafka|zookeeper|all]"
+  echo "  $ grid install [mesos|yarn|kafka|zookeeper|all]"
+  echo "  $ grid start [mesos|yarn|kafka|zookeeper|all]"
+  echo "  $ grid stop [mesos|yarn|kafka|zookeeper|all]"
   echo
   exit 1
 else
