@@ -53,8 +53,9 @@ bootstrap_yarn() {
 bootstrap_mesos() {
   echo "Bootstrapping the system (Mesos)..."
   stop_all_mesos
-  rm -rf "$DEPLOY_ROOT_DIR"
-  mkdir "$DEPLOY_ROOT_DIR"
+  rm -rf "$DEPLOY_ROOT_DIR/zookeeper"
+  rm -rf "$DEPLOY_ROOT_DIR/kafka"
+  mkdir -p "$DEPLOY_ROOT_DIR"
   install_all_mesos
   start_all_mesos
   exit 0
@@ -100,6 +101,10 @@ install_kafka() {
 
 install_mesos() {
   mkdir -p "$DEPLOY_ROOT_DIR"
+  if [ -d "$DEPLOY_ROOT_DIR/mesos" ]; then
+    echo "Using previous build of mesos. To rebuild, remove the existing mesos build directory."
+    return
+  fi
   install mesos $DOWNLOAD_MESOS mesos-0.19.1
   pushd $DEPLOY_ROOT_DIR/mesos
   $DEPLOY_ROOT_DIR/mesos/configure --prefix=$DEPLOY_ROOT_DIR/mesos/build
