@@ -233,7 +233,7 @@ stop_mesos() {
 }
 
 # Check arguments
-if [ "$COMMAND" == "bootstrap" ] && test -z "$SYSTEM"; then
+if [ "$COMMAND" == "bootstrap-yarn" ] && test -z "$SYSTEM"; then
   bootstrap_yarn
   exit 0
 elif [ "$COMMAND" == "bootstrap-mesos" ] && test -z "$SYSTEM"; then
@@ -245,7 +245,8 @@ elif (test -z "$COMMAND" && test -z "$SYSTEM") \
   echo "  Usage.."
   echo
   echo "  $ grid"
-  echo "  $ grid bootstrap"
+  echo "  $ grid bootstrap-mesos"
+  echo "  $ grid bootstrap-yarn"
   echo "  $ grid install [mesos|yarn|kafka|zookeeper|all]"
   echo "  $ grid start [mesos|yarn|kafka|zookeeper|all]"
   echo "  $ grid stop [mesos|yarn|kafka|zookeeper|all]"

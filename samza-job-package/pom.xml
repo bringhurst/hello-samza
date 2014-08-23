@@ -56,6 +56,11 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.samza</groupId>
+      <artifactId>samza-mesos_2.10</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.samza</groupId>
       <artifactId>samza-yarn_2.10</artifactId>
       <scope>runtime</scope>
     </dependency>
