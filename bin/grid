@@ -178,8 +178,9 @@ start_mesos() {
     mkdir -p $mesos_work_dir
     mkdir -p $DEPLOY_ROOT_DIR/$SYSTEM/build/logs
     cd $DEPLOY_ROOT_DIR/$SYSTEM/build
-    nohup sbin/mesos-master --ip=127.0.0.1 --work_dir=$mesos_work_dir > logs/mesos-master.log 2>&1 &
-    nohup sbin/mesos-slave --master=127.0.0.1:5050 --ip=127.0.0.1 > logs/mesos-slave.log 2>&1 &
+    nohup sbin/mesos-master --zk=zk://localhost:2181/mesos \
+        --quorum=1 --work_dir=$mesos_work_dir --ip=127.0.0.1 > logs/mesos-master.log 2>&1 &
+    nohup sbin/mesos-slave --master=zk://localhost:2181/mesos --ip=127.0.0.1 > logs/mesos-slave.log 2>&1 &
     cd - > /dev/null
   else
     echo 'Mesos is not installed. Run: bin/grid install mesos'
